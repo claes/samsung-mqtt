@@ -19,7 +19,6 @@ var debug *bool
 
 // TVInfo represents a remote TV.
 type TVInfo struct {
-	//Model string
 	IP net.IP
 }
 
@@ -138,6 +137,7 @@ func (controller *SamsungController) SendKey(emitter *NetworkInfo, receiver *TVI
 
 // Close the connection.
 func (controller *SamsungController) Close() error {
+	fmt.Println("Closing controller")
 	return controller.handle.Close()
 }
 
@@ -150,7 +150,7 @@ type SamsungRemoteMQTTBridge struct {
 	TVInfo      *TVInfo
 }
 
-func NewSamsungRemoteMQTTBridge(tvIPAddress *string /* tvModel *string, */, mqttBroker string) *SamsungRemoteMQTTBridge {
+func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttBroker string) *SamsungRemoteMQTTBridge {
 
 	networkInfo, err := getNetworkInformations()
 	if err != nil {
@@ -158,7 +158,6 @@ func NewSamsungRemoteMQTTBridge(tvIPAddress *string /* tvModel *string, */, mqtt
 	}
 
 	tv := &TVInfo{
-		//Model: *tvModel,
 		IP: net.ParseIP(*tvIPAddress),
 	}
 
@@ -166,13 +165,9 @@ func NewSamsungRemoteMQTTBridge(tvIPAddress *string /* tvModel *string, */, mqtt
 	err = controller.Connect(networkInfo, tv)
 	if err != nil {
 		panic(err)
+	} else if *debug {
+		fmt.Printf("Connected to Samsung TV: %s\n", *tvIPAddress)
 	}
-	defer controller.Close()
-
-	// err = controller.SendKey(nInfo, tv, os.Args[3])
-	// if err != nil {
-	// 	panic(err)
-	// }
 
 	opts := mqtt.NewClientOptions().AddBroker(mqttBroker)
 	client := mqtt.NewClient(opts)
@@ -197,17 +192,21 @@ func NewSamsungRemoteMQTTBridge(tvIPAddress *string /* tvModel *string, */, mqtt
 		token.Wait()
 	}
 	time.Sleep(2 * time.Second)
-	bridge.initialize(true)
 	return bridge
-}
-
-func (bridge *SamsungRemoteMQTTBridge) initialize(askPower bool) {
 }
 
 func (bridge *SamsungRemoteMQTTBridge) onKeySend(client mqtt.Client, message mqtt.Message) {
 	p := string(message.Payload())
-	bridge.PublishMQTT("samsungremote/key/send", "", false)
-	bridge.Controller.SendKey(bridge.NetworkInfo, bridge.TVInfo, p)
+	if p != "" {
+		bridge.PublishMQTT("samsungremote/key/send", "", false)
+		if *debug {
+			fmt.Printf("Sending key %s\n", p)
+		}
+		err := bridge.Controller.SendKey(bridge.NetworkInfo, bridge.TVInfo, p)
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 func (bridge *SamsungRemoteMQTTBridge) PublishMQTT(topic string, message string, retained bool) {
@@ -215,32 +214,17 @@ func (bridge *SamsungRemoteMQTTBridge) PublishMQTT(topic string, message string,
 	token.Wait()
 }
 
-func (bridge *SamsungRemoteMQTTBridge) SerialLoop() {
-	// buf := make([]byte, 128)
-	// for {
-	// 	n, err := bridge.SerialPort.Read(buf)
-	// 	if err != nil {
-	// 		log.Fatal(err)
-	// 	}
-	// 	bridge.ProcessRotelData(string(buf[:n]))
-
-	// 	jsonState, err := json.Marshal(bridge.State)
-	// 	if err != nil {
-	// 		continue
-	// 	}
-	// 	bridge.PublishMQTT("rotel/state", string(jsonState), true)
-	// }
+func (bridge *SamsungRemoteMQTTBridge) MainLoop() {
 }
 
 func printHelp() {
-	fmt.Println("Usage: rotel-mqtt [OPTIONS]")
+	fmt.Println("Usage: samsung-mqtt [OPTIONS]")
 	fmt.Println("Options:")
 	flag.PrintDefaults()
 }
 
 func main() {
-	tvIPAddress := flag.String("ip", "", "TV IP address")
-	//tvModel := flag.String("model", "", "TV model")
+	tvIPAddress := flag.String("tv", "", "TV IP address")
 	mqttBroker := flag.String("broker", "tcp://localhost:1883", "MQTT broker URL")
 	help := flag.Bool("help", false, "Print help")
 	debug = flag.Bool("debug", false, "Debug logging")
@@ -251,15 +235,16 @@ func main() {
 		os.Exit(0)
 	}
 
-	//bridge := NewSamsungRemoteMQTTBridge(tvIPAddress, tvModel, *mqttBroker)
 	bridge := NewSamsungRemoteMQTTBridge(tvIPAddress, *mqttBroker)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
 
 	fmt.Printf("Started\n")
-	go bridge.SerialLoop()
+	go bridge.MainLoop()
 	<-c
+	bridge.Controller.Close()
 	fmt.Printf("Shut down\n")
+
 	os.Exit(0)
 }
