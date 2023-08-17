@@ -15,8 +15,6 @@ import (
 
 var debug *bool
 
-//////// Borrowed from https://github.com/YuukanOO/rtv
-
 // TVInfo represents a remote TV.
 type TVInfo struct {
 	IP net.IP
@@ -140,8 +138,6 @@ func (controller *SamsungController) Close() error {
 	fmt.Println("Closing controller")
 	return controller.handle.Close()
 }
-
-//////// End borrow
 
 type SamsungRemoteMQTTBridge struct {
 	MQTTClient  mqtt.Client
