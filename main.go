@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"time"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -191,14 +192,19 @@ func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttBroker string) *Samsung
 	return bridge
 }
 
+var sendMutex sync.Mutex
+
 func (bridge *SamsungRemoteMQTTBridge) onKeySend(client mqtt.Client, message mqtt.Message) {
-	p := string(message.Payload())
-	if p != "" {
+	sendMutex.Lock()
+	defer sendMutex.Unlock()
+
+	command := string(message.Payload())
+	if command != "" {
 		bridge.PublishMQTT("samsungremote/key/send", "", false)
 		if *debug {
-			fmt.Printf("Sending key %s\n", p)
+			fmt.Printf("Sending key %s\n", command)
 		}
-		err := bridge.Controller.SendKey(bridge.NetworkInfo, bridge.TVInfo, p)
+		err := bridge.Controller.SendKey(bridge.NetworkInfo, bridge.TVInfo, command)
 		if err != nil {
 			panic(err)
 		}
