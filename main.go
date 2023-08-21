@@ -182,7 +182,8 @@ func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttBroker string) *Samsung
 	}
 
 	funcs := map[string]func(client mqtt.Client, message mqtt.Message){
-		"samsungremote/key/send": bridge.onKeySend,
+		"samsungremote/key/send":          bridge.onKeySend,
+		"samsungremote/key/reconnectsend": bridge.onKeyReconnectSend,
 	}
 	for key, function := range funcs {
 		token := client.Subscribe(key, 0, function)
@@ -192,17 +193,17 @@ func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttBroker string) *Samsung
 	return bridge
 }
 
-var reconnect = false
+var reconnectSamsungTV = false
 
 func (bridge *SamsungRemoteMQTTBridge) reconnectIfNeeded() {
-	if reconnect {
+	if reconnectSamsungTV {
 		err := bridge.Controller.Connect(bridge.NetworkInfo, bridge.TVInfo)
 		if *debug {
 			if err != nil {
 				fmt.Printf("Could not reconnect, %v\n", err)
 			} else {
-				fmt.Printf("Reconnection successful")
-				reconnect = false
+				fmt.Printf("Reconnection successful\n")
+				reconnectSamsungTV = false
 			}
 		}
 	}
@@ -225,8 +226,26 @@ func (bridge *SamsungRemoteMQTTBridge) onKeySend(client mqtt.Client, message mqt
 			if *debug {
 				fmt.Printf("Error while sending key, attempt reconnect\n")
 			}
-			reconnect = true
+			reconnectSamsungTV = true
 		}
+	}
+}
+
+func (bridge *SamsungRemoteMQTTBridge) onKeyReconnectSend(client mqtt.Client, message mqtt.Message) {
+	sendMutex.Lock()
+	defer sendMutex.Unlock()
+
+	command := string(message.Payload())
+	if command != "" {
+
+		reconnectSamsungTV = true
+		bridge.reconnectIfNeeded()
+
+		bridge.PublishMQTT("samsungremote/key/reconnectsend", "", false)
+		if *debug {
+			fmt.Printf("Sending key %s\n", command)
+		}
+		bridge.Controller.SendKey(bridge.NetworkInfo, bridge.TVInfo, command)
 	}
 }
 
