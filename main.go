@@ -237,14 +237,12 @@ func (bridge *SamsungRemoteMQTTBridge) onKeyReconnectSend(client mqtt.Client, me
 
 	command := string(message.Payload())
 	if command != "" {
-
-		reconnectSamsungTV = true
-		bridge.reconnectIfNeeded()
-
 		bridge.PublishMQTT("samsungremote/key/reconnectsend", "", false)
 		if *debug {
 			fmt.Printf("Sending key %s\n", command)
 		}
+		reconnectSamsungTV = true
+		bridge.reconnectIfNeeded()
 		bridge.Controller.SendKey(bridge.NetworkInfo, bridge.TVInfo, command)
 	}
 }
