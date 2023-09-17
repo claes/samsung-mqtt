@@ -161,7 +161,8 @@ func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttBroker string) *Samsung
 	controller := NewSamsungController()
 	err = controller.Connect(networkInfo, tv)
 	if err != nil {
-		panic(err)
+		fmt.Printf("Could not connect to Samsung TV (it may be off) %s, %v\n", *tvIPAddress, err)
+		reconnectSamsungTV = true
 	} else if *debug {
 		fmt.Printf("Connected to Samsung TV: %s\n", *tvIPAddress)
 	}
@@ -169,6 +170,7 @@ func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttBroker string) *Samsung
 	opts := mqtt.NewClientOptions().AddBroker(mqttBroker)
 	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
+		fmt.Printf("Could not connect to broker %s, %v\n", mqttBroker, token.Error())
 		panic(token.Error())
 	} else if *debug {
 		fmt.Printf("Connected to MQTT broker: %s\n", mqttBroker)
