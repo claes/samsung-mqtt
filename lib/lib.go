@@ -143,7 +143,7 @@ type SamsungRemoteMQTTBridge struct {
 	TVInfo      *TVInfo
 }
 
-func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttBroker string) *SamsungRemoteMQTTBridge {
+func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttClient mqtt.Client) *SamsungRemoteMQTTBridge {
 
 	networkInfo, err := getNetworkInformations()
 	if err != nil {
@@ -162,17 +162,8 @@ func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttBroker string) *Samsung
 	}
 	slog.Debug("Connected to Samsung TV", "ip", *tvIPAddress)
 
-	opts := mqtt.NewClientOptions().AddBroker(mqttBroker)
-	client := mqtt.NewClient(opts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		slog.Error("Could not connect to broker", "broker", mqttBroker, "error", token.Error())
-		panic(token.Error())
-	}
-
-	slog.Debug("Connected to MQTT broker", "broker", mqttBroker)
-
 	bridge := &SamsungRemoteMQTTBridge{
-		MQTTClient:  client,
+		MQTTClient:  mqttClient,
 		Controller:  controller,
 		NetworkInfo: networkInfo,
 		TVInfo:      tv,
@@ -183,11 +174,23 @@ func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttBroker string) *Samsung
 		"samsungremote/key/reconnectsend": bridge.onKeyReconnectSend,
 	}
 	for key, function := range funcs {
-		token := client.Subscribe(key, 0, function)
+		token := mqttClient.Subscribe(key, 0, function)
 		token.Wait()
 	}
 	time.Sleep(2 * time.Second)
 	return bridge
+}
+
+func CreateMQTTClient(mqttBroker string) mqtt.Client {
+	slog.Info("Creating MQTT client", "broker", mqttBroker)
+	opts := mqtt.NewClientOptions().AddBroker(mqttBroker)
+	client := mqtt.NewClient(opts)
+	if token := client.Connect(); token.Wait() && token.Error() != nil {
+		slog.Error("Could not connect to broker", "mqttBroker", mqttBroker, "error", token.Error())
+		panic(token.Error())
+	}
+	slog.Info("Connected to MQTT broker", "mqttBroker", mqttBroker)
+	return client
 }
 
 var reconnectSamsungTV = false

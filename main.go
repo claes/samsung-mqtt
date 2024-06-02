@@ -29,7 +29,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	bridge := lib.NewSamsungRemoteMQTTBridge(tvIPAddress, *mqttBroker)
+	bridge := lib.NewSamsungRemoteMQTTBridge(tvIPAddress, lib.CreateMQTTClient(*mqttBroker))
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)
