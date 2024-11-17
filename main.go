@@ -20,6 +20,7 @@ func printHelp() {
 func main() {
 	tvIPAddress := flag.String("tv", "", "TV IP address")
 	mqttBroker := flag.String("broker", "tcp://localhost:1883", "MQTT broker URL")
+	topicPrefix := flag.String("topicPrefix", "", "MQTT topic prefix")
 	help := flag.Bool("help", false, "Print help")
 	debug = flag.Bool("debug", false, "Debug logging")
 	flag.Parse()
@@ -29,7 +30,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	bridge := lib.NewSamsungRemoteMQTTBridge(tvIPAddress, lib.CreateMQTTClient(*mqttBroker))
+	bridge := lib.NewSamsungRemoteMQTTBridge(tvIPAddress, lib.CreateMQTTClient(*mqttBroker), *topicPrefix)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt)

@@ -138,12 +138,13 @@ func (controller *SamsungController) Close() error {
 
 type SamsungRemoteMQTTBridge struct {
 	MQTTClient  mqtt.Client
+	TopicPrefix string
 	Controller  *SamsungController
 	NetworkInfo *NetworkInfo
 	TVInfo      *TVInfo
 }
 
-func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttClient mqtt.Client) *SamsungRemoteMQTTBridge {
+func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttClient mqtt.Client, topicPrefix string) *SamsungRemoteMQTTBridge {
 
 	networkInfo, err := getNetworkInformations()
 	if err != nil {
@@ -164,6 +165,7 @@ func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttClient mqtt.Client) *Sa
 
 	bridge := &SamsungRemoteMQTTBridge{
 		MQTTClient:  mqttClient,
+		TopicPrefix: topicPrefix,
 		Controller:  controller,
 		NetworkInfo: networkInfo,
 		TVInfo:      tv,
@@ -174,7 +176,7 @@ func NewSamsungRemoteMQTTBridge(tvIPAddress *string, mqttClient mqtt.Client) *Sa
 		"samsungremote/key/reconnectsend": bridge.onKeyReconnectSend,
 	}
 	for key, function := range funcs {
-		token := mqttClient.Subscribe(key, 0, function)
+		token := mqttClient.Subscribe(topicPrefix+"/"+key, 0, function)
 		token.Wait()
 	}
 	time.Sleep(2 * time.Second)
@@ -241,8 +243,8 @@ func (bridge *SamsungRemoteMQTTBridge) onKeyReconnectSend(client mqtt.Client, me
 	}
 }
 
-func (bridge *SamsungRemoteMQTTBridge) PublishMQTT(topic string, message string, retained bool) {
-	token := bridge.MQTTClient.Publish(topic, 0, retained, message)
+func (bridge *SamsungRemoteMQTTBridge) PublishMQTT(subtopic string, message string, retained bool) {
+	token := bridge.MQTTClient.Publish(bridge.TopicPrefix+"/"+subtopic, 0, retained, message)
 	token.Wait()
 }
 
